@@ -5,7 +5,7 @@ menu "Project Ethernet Configuration"
     config PROJECT_USE_INTERNAL_ETHERNET
         depends on SOC_EMAC_SUPPORTED
         select ETH_USE_ESP32_EMAC
-        default y
+        default n
         bool "Internal EMAC"
         help
             Use internal Ethernet MAC controller.
@@ -90,7 +90,7 @@ menu "Project Ethernet Configuration"
 
     config PROJECT_USE_SPI_ETHERNET
         bool "SPI Ethernet"
-        default n
+        default y
         select ETH_USE_SPI_ETHERNET
         help
             Use external SPI-Ethernet module(s).
@@ -139,7 +139,7 @@ menu "Project Ethernet Configuration"
         config PROJECT_ETH_SPI_SCLK_GPIO
             int "SPI SCLK GPIO number"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
-            default 14 if IDF_TARGET_ESP32
+            default 18 if IDF_TARGET_ESP32
             default 12 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
             default 6 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2
             default 4 if IDF_TARGET_ESP32H2
@@ -149,7 +149,7 @@ menu "Project Ethernet Configuration"
         config PROJECT_ETH_SPI_MOSI_GPIO
             int "SPI MOSI GPIO number"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
-            default 13 if IDF_TARGET_ESP32
+            default 23 if IDF_TARGET_ESP32
             default 11 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
             default 7 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2
             default 5 if IDF_TARGET_ESP32H2
@@ -159,7 +159,7 @@ menu "Project Ethernet Configuration"
         config PROJECT_ETH_SPI_MISO_GPIO
             int "SPI MISO GPIO number"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_IN_RANGE_MAX
-            default 12 if IDF_TARGET_ESP32
+            default 19 if IDF_TARGET_ESP32
             default 13 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
             default 2 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2
             default 0 if IDF_TARGET_ESP32H2
@@ -177,7 +177,7 @@ menu "Project Ethernet Configuration"
         config PROJECT_ETH_SPI_CS0_GPIO
             int "SPI CS0 GPIO number for SPI Ethernet module #1"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
-            default 15 if IDF_TARGET_ESP32
+            default 5 if IDF_TARGET_ESP32
             default 10 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32C2
             default 1 if IDF_TARGET_ESP32H2
             help
@@ -198,7 +198,7 @@ menu "Project Ethernet Configuration"
         config PROJECT_ETH_SPI_INT0_GPIO
             int "Interrupt GPIO number SPI Ethernet module #1"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_IN_RANGE_MAX
-            default 4 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32S3
+            default 15 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32S3
             default 4 if IDF_TARGET_ESP32C2
             default 9 if IDF_TARGET_ESP32H2
             help
@@ -217,7 +217,7 @@ menu "Project Ethernet Configuration"
         config PROJECT_ETH_SPI_PHY_RST0_GPIO
             int "PHY Reset GPIO number of SPI Ethernet Module #1"
             range -1 ENV_GPIO_OUT_RANGE_MAX
-            default -1
+            default 4
             help
                 Set the GPIO number used to reset PHY chip on the first SPI Ethernet module.
                 Set to -1 to disable PHY chip hardware reset.

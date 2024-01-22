@@ -4,13 +4,13 @@ menu "Project Wifi Station Configuration"
         string "WiFi SSID"
         default "TEST"
         help
-            SSID (network name) for the example to connect to.
+            SSID (network name) for the project to connect to.
 
     config ESP_WIFI_PASSWORD
         string "WiFi Password"
-        default "TEST"
+        default "TEST1234"
         help
-            WiFi password (WPA or WPA2) for the example to use.
+            WiFi password (WPA or WPA2) for the project.
 
     choice ESP_WIFI_SAE_MODE
         prompt "WPA3 SAE mode selection"
@@ -76,7 +76,7 @@ menu "Project WiFi SoftAP Configuration"
 
     config ESP_WIFI_SOFTAP_PASSWORD
         string "WiFi SoftAP Password"
-        default "ESP32"
+        default "ESP321234"
         help
             WiFi password (WPA or WPA2) for the project to use for softAP.
     config ESP_WIFI_SOFTAP_CHANNEL
