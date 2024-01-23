@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="shortcut icon" href="#" />
+    <title>AmpleTrails</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body style="overflow: scroll">
+    <div class="container">
+      <h1>AmpleTrails Door Control System</h1>
+      <button onclick="window.location.href='/index.html';">
+        <span>&#8678;</span>
+      </button>
+      <fieldset>
+        <legend>Device Id</legend>
+        <span id="serialno"></span>
+      </fieldset>
+
+      <fieldset>
+        <legend>WiFi Settings</legend>
+        <!--<h3>Set Date & Time</h3>-->
+        <div class="form-row">
+          <label for="ssid">SSID:</label>
+          <input type="text" id="ssid" />
+        </div>
+        <div class="form-row">
+          <label for="pwd">PASSWORD:</label>
+          <input type="password" id="pwd" />
+        </div>
+        <button id="saveWiFiButton">Save</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>API Settings</legend>
+        <!--<h3>Set Date & Time</h3>-->
+        <div class="form-row">
+          <label for="apiurl">API URL:</label>
+          <input type="text" id="apiurl" />
+        </div>
+        <div class="form-row">
+          <label for="interval">INTERVAL:</label>
+          <input type="number" id="interval" />
+        </div>
+        <div class="form-row">
+          <label for="interval">API CALL:</label>
+          <input type="button" style="background-color: red" value="DISABLE" />
+        </div>
+        <button id="saveWiFiButton">Save</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Set Date & Time</legend>
+        <!--<h3>Set Date & Time</h3>-->
+        <div class="form-row">
+          <label for="date">Date:</label>
+          <input type="date" id="date" />
+        </div>
+        <div class="form-row">
+          <label for="time">Time:</label>
+          <input type="time" id="time" />
+        </div>
+        <button id="saveDateTimeButton">Save</button>
+        <button id="syncDateTimeButton">Sync Date And Time</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>General Settings</legend>
+        <!--<h3>Set Date & Time</h3>-->
+        <button id="saveWiFiButton">Factory Reset</button>
+        <button id="saveWiFiButton">Change Admin Password</button>
+      </fieldset>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", async (event) => {
+        let ser_uri = "/getSerialNo";
+        const ser_response = await fetch(ser_uri);
+        const ser_response_txt = await ser_response.text();
+        document.getElementById("serialno").innerHTML = ser_response_txt;
+      });
+    </script>
+  </body>
+</html>

@@ -1,10 +1,48 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>ESP-Webserver</title>
+    <meta charset="UTF-8" />
+    <link rel="shortcut icon" href="#" />
+    <title>AmpleTrails</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <h1>ESP32 Webserver</h1>
-    This is a simple webpage for demonstrating esp32 webeserver functionality.
+
+  <body style="overflow: scroll">
+    <div class="container">
+      <h1>AmpleTrails Door Control System</h1>
+      <button onclick="window.location.href='/admin.html';">
+        <span>&#9881;</span>
+      </button>
+      <fieldset>
+        <legend>Device Id</legend>
+        <span id="serialno"></span>
+		
+      </fieldset>
+	  <fieldset>
+		<legend>Device State</legend>
+		<div class="form-group">
+			<label for="schedule">Door State:</label>
+			<input type="text" id="schedule" value="CLOSE" readonly disabled></input>
+		</div>
+		<div class="form-group">
+			<label for="schedule">WiFi State:</label>
+			<input type="text" id="schedule" value="CONNECTED" readonly disabled></input>
+		</div>
+		<div class="form-group">
+			<label for="schedule">Ethernet State:</label>
+			<input type="text" id="schedule" value="CONNECTED" readonly disabled></input>
+		</div>
+	  </fieldset>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", async (event) => {
+        let ser_uri = "/getSerialNo";
+        const ser_response = await fetch(ser_uri);
+        const ser_response_txt = await ser_response.text();
+        document.getElementById("serialno").innerHTML = ser_response_txt;
+      });
+    </script>
   </body>
 </html>

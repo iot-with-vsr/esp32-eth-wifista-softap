@@ -1,0 +1,189 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: #f2f2f2;
+  width: 100%;
+}
+
+h1 {
+  text-align: center;
+}
+
+fieldset {
+  margin-top: 10px;
+  border-color: #cccccc;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%; /*Sachin*/
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.modal-content {
+  background-color: #fefefe;
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 85%; /*Sachin*/
+  /*width: 500px;*/
+}
+
+.close {
+  color: #aaa;
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+input[type="number"],
+select,
+input[type="date"] {
+  width: 100%;
+  padding: 8px;
+  border-radius: 3px;
+  border: 1px solid #ccc;
+  margin-bottom: 10px;
+}
+
+button {
+  padding: 10px 20px;
+  background-color: #4caf50;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+button:active {
+  padding: 10px 20px;
+  background-color: grey;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table th,
+table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.form-group {
+  display: flex;
+  align-items: center;
+}
+
+.form-group label {
+  width: 150px;
+  margin-right: 10px;
+}
+
+.form-group input[type="number"],
+.form-group select,
+input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 3px;
+  border: 1px solid #ccc;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.form-row label {
+  margin-right: 10px;
+  margin-left: 10px;
+}
+
+.form-row input[type="time"],
+.form-row input[type="number"] {
+  min-width: 100px;
+  flex-grow: 1;
+  padding: 5px;
+  border-radius: 3px;
+  border: 1px solid #ccc;
+}
+
+iframe {
+  display: none;
+}
+
+.developed-label {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* Mobile-friendly responsive design */
+@media screen and (max-width: 600px) {
+  .container {
+    padding: 10px;
+  }
+
+  .form-group,
+  .form-row {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-group label,
+  .form-row label {
+    margin-bottom: 5px;
+  }
+
+  .form-group input[type="number"],
+  .form-group select,
+  .form-row input[type="time"],
+  .form-row input[type="number"],
+  select,
+  input[type="date"] {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .form-group input,
+  input[type="date"] {
+    margin-bottom: 10px;
+  }
+
+  button {
+    width: 100%;
+    margin-top: 10px;
+  }
+}

@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "ethernet_init.h"
 #include "sdkconfig.h"
+#include "system_config.h"
 
 void app_ethernet_init(void);
 

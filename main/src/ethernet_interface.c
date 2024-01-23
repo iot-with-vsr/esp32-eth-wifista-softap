@@ -17,15 +17,19 @@ static void eth_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Ethernet Link Up");
         ESP_LOGI(TAG, "Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
                  mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+
+        setEthernetStatus(ETH_CONNECTED_BUT_NO_IP);
         break;
     case ETHERNET_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "Ethernet Link Down");
+        setEthernetStatus(ETH_NOT_CONNECTED);
         break;
     case ETHERNET_EVENT_START:
         ESP_LOGI(TAG, "Ethernet Started");
         break;
     case ETHERNET_EVENT_STOP:
         ESP_LOGI(TAG, "Ethernet Stopped");
+        setEthernetStatus(ETH_NOT_CONNECTED);
         break;
     default:
         break;
@@ -45,6 +49,8 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
     ESP_LOGI(TAG, "ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
     ESP_LOGI(TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
     ESP_LOGI(TAG, "~~~~~~~~~~~");
+
+    setEthernetStatus(ETH_CONNECTED);
 }
 
 void app_ethernet_init()

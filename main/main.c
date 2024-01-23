@@ -18,12 +18,13 @@ ESP32 - W500
 #include "ethernet_init.h"
 #include "sdkconfig.h"
 #include "ethernet_interface.h"
-#include "wifi_init.h"
+#include "wifi_interface.h"
 #include "esp_vfs_fat.h"
 #include "esp_spiffs.h"
 #include "mdns.h"
 #include "lwip/apps/netbiosns.h"
 #include "server_setup.h"
+#include "system_config.h"
 
 #define MDNS_INSTANCE "esp web server"
 #define CONFIG_MDNS_HOST_NAME "esp"
@@ -103,6 +104,9 @@ void app_main(void)
     initialise_mdns();
     netbiosns_init();
     netbiosns_set_name(CONFIG_MDNS_HOST_NAME);
+
+    // load system config
+    load_system_config();
 
     // App Ethernet
     app_ethernet_init();

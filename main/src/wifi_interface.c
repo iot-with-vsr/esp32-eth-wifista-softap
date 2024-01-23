@@ -1,4 +1,4 @@
-#include "wifi_init.h"
+#include "wifi_interface.h"
 
 #define PROJECT_ESP_WIFI_SSID CONFIG_ESP_WIFI_SSID
 #define PROJECT_ESP_WIFI_PASS CONFIG_ESP_WIFI_PASSWORD
@@ -49,6 +49,7 @@ static EventGroupHandle_t s_wifi_event_group;
 static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
+static bool is_wifi_connected = false;
 
 static void event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
@@ -70,6 +71,7 @@ static void event_handler(void *arg, esp_event_base_t event_base,
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
         ESP_LOGI(TAG, "connect to the AP fail");
+        setWiFiStatus(WIFI_STATUS_DISCONNECTED);
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
@@ -77,6 +79,7 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        setWiFiStatus(WIFI_STATUS_CONNECTED);
     }
     else if (event_id == WIFI_EVENT_AP_STACONNECTED)
     {
@@ -92,13 +95,8 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-void app_wifi_init(void)
+void app_wifi_connect(void)
 {
-    s_wifi_event_group = xEventGroupCreate();
-
-    esp_netif_create_default_wifi_sta();
-    esp_netif_create_default_wifi_ap();
-
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
@@ -130,6 +128,9 @@ void app_wifi_init(void)
         },
 
     };
+
+    strcpy((char *)wifi_config.sta.ssid, WIFI_SSID);
+    strcpy((char *)wifi_config.sta.password, WIFI_PASS);
 
     wifi_config_t wifi_config_ap = {
         .ap = {
@@ -163,26 +164,35 @@ void app_wifi_init(void)
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-                                           WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-                                           pdFALSE,
-                                           pdFALSE,
-                                           portMAX_DELAY);
+    // EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+    //                                        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+    //                                        pdFALSE,
+    //                                        pdFALSE,
+    //                                        portMAX_DELAY);
 
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
-     * happened. */
-    if (bits & WIFI_CONNECTED_BIT)
-    {
-        ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-                 PROJECT_ESP_WIFI_SSID, PROJECT_ESP_WIFI_PASS);
-    }
-    else if (bits & WIFI_FAIL_BIT)
-    {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-                 PROJECT_ESP_WIFI_SSID, PROJECT_ESP_WIFI_PASS);
-    }
-    else
-    {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
-    }
+    // /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
+    //  * happened. */
+    // if (bits & WIFI_CONNECTED_BIT)
+    // {
+    //     ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
+    //              PROJECT_ESP_WIFI_SSID, PROJECT_ESP_WIFI_PASS);
+    // }
+    // else if (bits & WIFI_FAIL_BIT)
+    // {
+    //     ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
+    //              PROJECT_ESP_WIFI_SSID, PROJECT_ESP_WIFI_PASS);
+    // }
+    // else
+    // {
+    //     ESP_LOGE(TAG, "UNEXPECTED EVENT");
+    // }
+}
+
+void app_wifi_init(void)
+{
+    s_wifi_event_group = xEventGroupCreate();
+    esp_netif_create_default_wifi_sta();
+    esp_netif_create_default_wifi_ap();
+
+    app_wifi_connect();
 }
