@@ -5,43 +5,381 @@
     <link rel="shortcut icon" href="#" />
     <title>AmpleTrails</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
 
   <body style="overflow: scroll">
-    <div class="container">
+    <div class="container" id="main" style="display: none;">
       <h1>AmpleTrails Door Control System</h1>
       <button onclick="window.location.href='/admin.html';">
-        <span>&#9881;</span>
+        <span>Go to Admin Page</span>
       </button>
       <fieldset>
         <legend>Device Id</legend>
         <span id="serialno"></span>
-		
       </fieldset>
-	  <fieldset>
-		<legend>Device State</legend>
-		<div class="form-group">
-			<label for="schedule">Door State:</label>
-			<input type="text" id="schedule" value="CLOSE" readonly disabled></input>
-		</div>
-		<div class="form-group">
-			<label for="schedule">WiFi State:</label>
-			<input type="text" id="schedule" value="CONNECTED" readonly disabled></input>
-		</div>
-		<div class="form-group">
-			<label for="schedule">Ethernet State:</label>
-			<input type="text" id="schedule" value="CONNECTED" readonly disabled></input>
-		</div>
-	  </fieldset>
+
+      <fieldset>
+        <legend>Device State</legend>
+        <div class="form-group">
+          <label for="door">Door State:</label>
+          <input type="text" id="door" value="CLOSE" readonly disabled></input>
+        </div>
+        <div class="form-group">
+          <label for="wifi">WiFi State:</label>
+          <input type="text" id="wifi" value="CONNECTED" readonly disabled></input>
+        </div>
+        <div class="form-group">
+          <label for="eth">Ethernet State:</label>
+          <input type="text" id="eth" value="CONNECTED" readonly disabled></input>
+        </div>
+        </fieldset>
+
+      <fieldset>
+        <legend>WiFi Settings</legend>
+        <!--<h3>Set Date & Time</h3>-->
+        <form onsubmit="saveWiFiSettings(event)">
+        <div class="form-row">
+          <label for="ssid">SSID:</label>
+          <input type="text" id="ssid" />
+        </div>
+        <div class="form-row">
+          <label for="pwd">PASSWORD:</label>
+          <input type="password" id="pwd" />
+        </div>
+        <button class="btn">Save</button>
+      </form>
+      </fieldset>
+
+      <fieldset>
+        <legend>API Settings</legend>
+        <!--<h3>Set Date & Time</h3>-->
+        <form onsubmit="saveAPiSettings(event)">
+          <div class="form-row">
+          <label for="apiurl">API URL:</label>
+          <input type="text" id="apiurl" />
+        </div>
+        <div class="form-row">
+          <label for="comp">COMPANY ID:</label>
+          <input type="text" id="comp" />
+        </div>
+        <div class="form-row">
+          <label for="apikey">API KEY:</label>
+          <input type="text" id="apikey" />
+        </div>
+        <div class="form-row">
+          <label for="interval">INTERVAL(Seconds):</label>
+          <input type="number" id="interval" />
+        </div>
+        <div class="form-row">
+          <label for="status">API CALL:</label>
+          <input type="button" id="status" onclick="changeAPIStatus()" style="background-color: red" value="DISABLE" />
+        </div>
+        
+        <button class="btn">Save</button></form>
+      </fieldset>
+
+      <fieldset>
+        <legend>Set Date & Time</legend>
+        <div class="form-row">
+          <label for="date">Date:</label>
+          <input type="date" id="date" />
+        </div>
+        <div class="form-row">
+          <label for="time">Time:</label>
+          <input type="time" id="time" />
+        </div>
+        <button id="saveDateTimeButton">Save</button>
+        <button id="syncDateTimeButton">Sync Date And Time</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>General Settings</legend>
+        <!--<h3>Set Date & Time</h3>-->
+        <button onclick="factoryReset()">Factory Reset</button>
+        <button onclick="changePasswordModal()">Change Admin Password</button>
+      </fieldset>
+    </div>
+
+    <div style="overflow: scroll; width: 100%">
+      <div id="changePassword" class="modal">
+        <div class="modal-content">
+          <span class="close" id="changePasswordClose">&times;</span>
+          <h3>Change Password</h3>
+  
+          <form onsubmit="changePassword(event)">
+            <div class="form-group">
+              <label for="current-pwd">Current Password:</label>
+              <input type="password" id="current-pwd" required></input>
+            </div>
+            <div class="form-group">
+              <label for="new-pwd">New Password:</label>
+              <input type="password" id="new-pwd" required></input>
+            </div>
+            <div class="form-group">
+              <label for="cnf-pwd">Confirm Password:</label>
+              <input type="password" id="cnf-pwd" required></input>
+            </div>
+            <button class="btn">Change</button>
+          </form>
+  
+        </div>
+      </div>
     </div>
 
     <script>
+      var changePwdModal = document.getElementById("changePassword");
+      var changePwdModalClose = document.getElementById("changePasswordClose");
+      const saveDateTimeButton = document.getElementById('saveDateTimeButton');
+		  const syncDateTimeButton = document.getElementById('syncDateTimeButton');
+      const dateInput = document.getElementById("date");
+      const timeInput = document.getElementById("time");
+      var api_status = 1;
+
+      changePwdModalClose.onclick = function () {
+        changePwdModal.style.display = "none";
+      };
+
+      async function updateDeviceStatus() {
+  try {
+    const ser_uri = "/getDeviceStatus";
+    const ser_response = await fetch(ser_uri);
+    const ser_response_txt = await ser_response.json();
+    
+    // Update the HTML elements with the new device status
+    document.getElementById("serialno").innerHTML = ser_response_txt.mac;
+    document.getElementById("wifi").value = ser_response_txt.wifi;
+    document.getElementById("eth").value = ser_response_txt.eth;
+    document.getElementById("door").value = ser_response_txt.door;
+    
+    // Show the main container
+    //document.getElementById("main").style.display = "block";
+  } catch (error) {
+    //console.error("Error updating device status:", error);
+  }
+}
+
+      function changeAPIStatus(){
+        const status = document.getElementById("status").value;
+
+        if(status == "DISABLE"){
+          api_status = 0;
+          document.getElementById("status").value = "ENABLE";
+          document.getElementById("status").style.backgroundColor = "#4caf50";
+        }else{
+          api_status = 1;
+          document.getElementById("status").value = "DISABLE";
+          document.getElementById("status").style.backgroundColor = "red";
+        }
+      }
+
+      async function makePostRequest(uri, data) {
+        var response = await fetch(uri, {
+          method: "POST",
+          mode: "cors", // no-cors, *cors, same-origin
+          cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
+          credentials: "same-origin", // include, *same-origin, omit
+          headers: {
+            "Content-Type": "application/json",
+          },
+          redirect: "follow", // manual, *follow, error
+          referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+          body: JSON.stringify(data), // body data type must match "Content-Type" header
+        });
+
+        return response;
+      }
+
+      var weekdays_1 = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+		function formatDateTime(date, time) {
+			console.log(date);
+			console.log(time);
+			var givenDate = new Date(date);
+			var time_a = time.split(":");
+			console.log(time_a);
+			var dayOfMonth = givenDate.getDate();
+			var year = givenDate.getFullYear();
+			var month = givenDate.getMonth() + 1; // Adding 1 because the month is zero-based
+			var dayOfWeek = givenDate.getDay();
+
+			return {
+				day: dayOfMonth,
+				year: year,
+				month: month,
+				//dayOfWeek: weekdays_1[dayOfWeek],
+				hh: parseInt(time_a[0]),
+				mm: parseInt(time_a[1]),
+				ss: 0
+			};
+		}
+		
+		function currentFormattetDateTime(date, time) {
+			const currentDate = new Date();
+
+			// Extract various components
+			const dayOfMonth = currentDate.getDate();
+			const year = currentDate.getFullYear();
+			const month = currentDate.getMonth() + 1; // Months are 0-indexed, so we add 1
+			const dayOfWeek = currentDate.getDay(); // 0 (Sunday) through 6 (Saturday)
+			const time_a = currentDate.toLocaleTimeString('en-US').split(':'); // Get the time and split it into hours and minutes
+
+			// Create the JSON object
+			const jsonObject = {
+				day: dayOfMonth,
+				year: year,
+				month: month,
+				//dayOfWeek: weekdays_1[dayOfWeek],
+				hh: parseInt(time_a[0]),
+				mm: parseInt(time_a[1]),
+				ss: parseInt(time_a[2])
+			};
+
+			// Return the JSON object
+			return jsonObject;
+		}
+
+      saveDateTimeButton.addEventListener("click", async () => {
+
+let data = formatDateTime(dateInput.value, timeInput.value);
+console.log(data);
+
+const response = await makePostRequest("/saveDateTime", data);
+//console.log(response);
+let response_txt = await response.text();
+console.log(response_txt);
+if(response_txt == "Date/Time saved successfully"){
+  alert(response_txt);
+}else{
+  alert("Failed to save Date/Time");
+}
+});
+
+syncDateTimeButton.addEventListener("click", async () => {
+
+let data = currentFormattetDateTime();
+console.log(data);
+
+const response = await makePostRequest("/saveDateTime", data);
+let response_txt = await response.text();
+console.log(response_txt);
+if(response_txt == "Date/Time saved successfully"){
+  alert(response_txt);
+}else{
+  alert("Failed to Sync Date/Time");
+}
+});
+
+      async function changePassword(event) {
+        event.preventDefault();
+        const current_pwd = document.getElementById("current-pwd").value;
+        const new_pwd = document.getElementById("new-pwd").value;
+        const cnf_pwd = document.getElementById("cnf-pwd").value;
+        if (cnf_pwd == new_pwd) {
+          let obj = new Object({});
+          obj.current = current_pwd;
+          obj.new = new_pwd;
+          const response = await makePostRequest("changePassword", obj);
+          const response_txt = await response.text();
+          if (response_txt == "Password Changed Successfully") {
+            setTimeout(() => {
+              alert("Passworc Changed Successfully");
+              document.location.reload();
+            }, 2000);
+          } else {
+            alert(response_txt);
+          }
+        } else {
+          alert("New Password and Confirm Password should match.");
+        }
+      }
+
+      async function factoryReset(){
+			let text = "Press OK to reset factory settings.";
+			if (confirm(text) == true) {
+				//alert("Factory Reset ");
+				var uri = "/factoryReset";
+				const response = await fetch(uri);
+				document.location.reload();
+			} else {
+				//alert("Factory Reset Cancelled");
+			}
+		}
+
+    async function saveWiFiSettings(event){
+      event.preventDefault();
+      const ssid = document.getElementById("ssid").value;
+      const pwd = document.getElementById("pwd").value;
+
+      let obj = new Object({});
+      obj.ssid = ssid;
+      obj.pwd = pwd;
+
+      const response = await makePostRequest("saveWifiSettings", obj);
+      const response_txt = await response.text();
+
+      if(response_txt == "WiFi Credentials saved successfully"){
+        alert(response_txt);
+      }else{
+        alert("WiFi Settings could not be saved.")
+      }
+    }
+
+    async function saveAPiSettings(event){
+      event.preventDefault();
+
+      const apiurl = document.getElementById("apiurl").value;
+      const interval = document.getElementById("interval").value;
+      const apikey = document.getElementById("apikey").value;
+      const comp_id = document.getElementById("comp").value;
+      //const status = document.getElementById("status").value;
+
+      let obj = new Object({});
+      obj.url = apiurl;
+      obj.interval = parseInt(interval);
+      obj.status = api_status;
+      obj.key = apikey;
+      obj.id = comp_id;
+      const response = await makePostRequest("saveApiSettings", obj);
+      const response_txt = await response.text();
+
+      if(response_txt == "API Settings saved successfully"){
+        alert(response_txt);
+      }else{
+        alert("API Settings could not be saved.")
+      }
+
+
+    }
+
+      function changePasswordModal() {
+        changePwdModal.style.display = "block";
+      }
+
       document.addEventListener("DOMContentLoaded", async (event) => {
-        let ser_uri = "/getSerialNo";
+        let ser_uri = "/getAdminSettings";
         const ser_response = await fetch(ser_uri);
-        const ser_response_txt = await ser_response.text();
-        document.getElementById("serialno").innerHTML = ser_response_txt;
+        const ser_response_txt = await ser_response.json();
+        document.getElementById("serialno").innerHTML = ser_response_txt.mac;
+        document.getElementById("ssid").value = ser_response_txt.ssid;
+        document.getElementById("pwd").value = ser_response_txt.pwd;
+        document.getElementById("interval").value = ser_response_txt.interval;
+        document.getElementById("apiurl").value = ser_response_txt.url;
+        document.getElementById("apikey").value = ser_response_txt.key;
+        document.getElementById("comp").value = ser_response_txt.id;
+        if(ser_response_txt.status == "1"){
+          document.getElementById("status").value = "DISABLE";
+          document.getElementById("status").style.backgroundColor = "red";
+        }else{
+          document.getElementById("status").value = "ENABLE";
+          document.getElementById("status").style.backgroundColor = "#4caf50";
+        }
+
+        await updateDeviceStatus();
+
+        document.getElementById("main").style.display = "block";
+
+        const intervalId = setInterval(updateDeviceStatus, 10000);
+        
       });
     </script>
   </body>

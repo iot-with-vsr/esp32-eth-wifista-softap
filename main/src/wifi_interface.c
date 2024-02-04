@@ -60,17 +60,17 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
-        if (s_retry_num < PROJECT_ESP_MAXIMUM_RETRY)
-        {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
-        }
-        else
-        {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-        }
-        ESP_LOGI(TAG, "connect to the AP fail");
+        // if (s_retry_num < PROJECT_ESP_MAXIMUM_RETRY)
+        // {
+        esp_wifi_connect();
+        //     s_retry_num++;
+        //     ESP_LOGI(TAG, "retry to connect to the AP");
+        // }
+        // else
+        // {
+        //     xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+        // }
+        // ESP_LOGI(TAG, "connect to the AP fail");
         setWiFiStatus(WIFI_STATUS_DISCONNECTED);
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
@@ -113,21 +113,7 @@ void app_wifi_connect(void)
                                                         NULL,
                                                         &instance_got_ip));
 
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = PROJECT_ESP_WIFI_SSID,
-            .password = PROJECT_ESP_WIFI_PASS,
-            /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
-             * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
-             * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
-             * WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK standards.
-             */
-            .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,
-            .sae_pwe_h2e = ESP_WIFI_SAE_MODE,
-            .sae_h2e_identifier = PROJECT_H2E_IDENTIFIER,
-        },
-
-    };
+    wifi_config_t wifi_config = {0};
 
     strcpy((char *)wifi_config.sta.ssid, WIFI_SSID);
     strcpy((char *)wifi_config.sta.password, WIFI_PASS);
@@ -136,18 +122,9 @@ void app_wifi_connect(void)
         .ap = {
             .ssid = PROJECT_SOFTAP_ESP_WIFI_SSID,
             .ssid_len = strlen(PROJECT_SOFTAP_ESP_WIFI_SSID),
-            .channel = PROJECT_SOFTAP_ESP_WIFI_CHANNEL,
             .password = PROJECT_SOFTAP_ESP_WIFI_PASS,
             .max_connection = PROJECT_SOFTAP_MAX_STA_CONN,
-#ifdef CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT
-            .authmode = WIFI_AUTH_WPA3_PSK,
-            .sae_pwe_h2e = WPA3_SAE_PWE_BOTH,
-#else /* CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT */
-            .authmode = WIFI_AUTH_WPA2_PSK,
-#endif
-            .pmf_cfg = {
-                .required = true,
-            },
+            .authmode = WIFI_AUTH_WPA_WPA2_PSK,
         },
     };
     if (strlen(PROJECT_SOFTAP_ESP_WIFI_PASS) == 0)

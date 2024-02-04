@@ -3,6 +3,7 @@
 #include "esp_wifi.h"
 #include "system_config.h"
 #include "wifi_interface.h"
+#include "common_rtc.h"
 
 static const char *TAG = "server_setup";
 
@@ -29,6 +30,13 @@ typedef struct rest_server_context
 
 #define HTTPD_401 "401 UNAUTHORIZED" /*!< HTTP Response 401 */
 
+typedef enum
+{
+    ADMIN_LOGIN,
+    USER_LOGIN,
+    ANY_USER
+} Auth_Who_t;
+
 static char *http_auth_basic(const char *username, const char *password)
 {
     int out;
@@ -44,7 +52,7 @@ static char *http_auth_basic(const char *username, const char *password)
     return digest;
 }
 
-static bool authorize(httpd_req_t *req)
+static bool authorize(httpd_req_t *req, Auth_Who_t who, bool send_realm)
 {
     char *buf = NULL;
     size_t buf_len = 0;
@@ -63,29 +71,61 @@ static bool authorize(httpd_req_t *req)
             ESP_LOGE(TAG, "No auth value received");
         }
 
-        char *auth_credentials = http_auth_basic(API_USERNAME, API_PASSWORD);
-        if (strncmp(auth_credentials, buf, buf_len))
+        char *admin_credentials = http_auth_basic(ADMIN_USERNAME, ADMIN_PASSWORD);
+        char *user_credentials = http_auth_basic(USER_USERNAME, USER_PASSWORD);
+
+        uint8_t is_admin_verified = !strncmp(admin_credentials, buf, buf_len);
+        uint8_t is_user_verified = !strncmp(user_credentials, buf, buf_len);
+
+        if (who == ADMIN_LOGIN)
+        {
+            ESP_LOGI(TAG, "ADMIN LOGIN");
+        }
+        else if (who == USER_LOGIN)
+        {
+            ESP_LOGI(TAG, "USER_LOGIN");
+        }
+        else if (who == ANY_USER)
+        {
+            ESP_LOGI(TAG, "ANY_USER");
+        }
+
+        if (who == ADMIN_LOGIN && is_admin_verified)
+        {
+            authorized = true;
+        }
+        else if (who == USER_LOGIN && is_user_verified)
+        {
+            authorized = true;
+        }
+        else if ((who == ANY_USER) && (is_admin_verified || is_user_verified))
+        {
+            authorized = true;
+        }
+        else
+        {
+            authorized = false;
+        }
+
+        if (!authorized)
         {
             ESP_LOGE(TAG, "Not authenticated");
-            httpd_resp_set_status(req, HTTPD_401);
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_set_hdr(req, "Connection", "keep-alive");
-            httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"Hello\"");
-            httpd_resp_send(req, NULL, 0);
+
+            if (send_realm)
+            {
+                httpd_resp_set_status(req, HTTPD_401);
+                httpd_resp_set_type(req, "application/json");
+                httpd_resp_set_hdr(req, "Connection", "keep-alive");
+                httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"Hello\"");
+                httpd_resp_send(req, NULL, 0);
+            }
         }
         else
         {
             ESP_LOGI(TAG, "Authenticated!");
-            authorized = true;
-            // char *basic_auth_resp = NULL;
-            // httpd_resp_set_status(req, HTTPD_200);
-            // httpd_resp_set_type(req, "application/json");
-            // httpd_resp_set_hdr(req, "Connection", "keep-alive");
-            // asprintf(&basic_auth_resp, "{\"authenticated\": true,\"user\": \"%s\"}", basic_auth_info->username);
-            // httpd_resp_send(req, basic_auth_resp, strlen(basic_auth_resp));
-            // free(basic_auth_resp);
         }
-        free(auth_credentials);
+        free(admin_credentials);
+        free(user_credentials);
         free(buf);
     }
     else
@@ -132,10 +172,61 @@ static esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filepa
     return httpd_resp_set_type(req, type);
 }
 
-/* Send HTTP response with the contents of the requested file */
-static esp_err_t admin_get_handler(httpd_req_t *req)
+esp_err_t log_handler(httpd_req_t *req)
 {
-    if (!authorize(req))
+
+    if (!authorize(req, ANY_USER, true))
+    {
+        return ESP_OK;
+    }
+
+    // Concatenate log messages with '\n' separator
+    int logIndex = getNumLogs();
+
+    char response[logIndex * LOG_MESSAG_SIZE]; // Assuming each message is a string of up to 255 characters
+    response[0] = '\0';
+    for (int i = 0; i < logIndex && i < LOG_BUFFER_SIZE; i++)
+    {
+        strcat(response, getLogAtIdx(i));
+        strcat(response, "\n");
+    }
+
+    // Send the response
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_send(req, response, strlen(response));
+
+    return ESP_OK;
+}
+
+esp_err_t pending_log_handler(httpd_req_t *req)
+{
+
+    if (!authorize(req, ANY_USER, true))
+    {
+        return ESP_OK;
+    }
+
+    // Concatenate log messages with '\n' separator
+    int logIndex = getNumPendingLogs();
+
+    char response[logIndex * LOG_MESSAG_SIZE]; // Assuming each message is a string of up to 255 characters
+    response[0] = '\0';
+    for (int i = 0; i < logIndex && i < LOG_BUFFER_SIZE; i++)
+    {
+        strcat(response, getPendingLogAtIdx(i));
+        strcat(response, "\n");
+    }
+
+    // Send the response
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_send(req, response, strlen(response));
+
+    return ESP_OK;
+}
+
+static esp_err_t user_get_handler(httpd_req_t *req)
+{
+    if (!authorize(req, USER_LOGIN, true))
     {
         return ESP_OK; // if not authorize return here
     }
@@ -144,14 +235,66 @@ static esp_err_t admin_get_handler(httpd_req_t *req)
 
     rest_server_context_t *rest_context = (rest_server_context_t *)req->user_ctx;
     strlcpy(filepath, rest_context->base_path, sizeof(filepath));
-    if (req->uri[strlen(req->uri) - 1] == '/')
+    strlcat(filepath, "/index.html", sizeof(filepath));
+
+    int fd = open(filepath, O_RDONLY, 0);
+    if (fd == -1)
     {
-        strlcat(filepath, "/index.html", sizeof(filepath));
+        ESP_LOGE(TAG, "Failed to open file : %s", filepath);
+        /* Respond with 500 Internal Server Error */
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "");
+        return ESP_FAIL;
     }
-    else
+
+    set_content_type_from_file(req, filepath);
+
+    char *chunk = rest_context->scratch;
+    ssize_t read_bytes;
+    do
     {
-        strlcat(filepath, req->uri, sizeof(filepath));
+        /* Read file in chunks into the scratch buffer */
+        read_bytes = read(fd, chunk, SCRATCH_BUFSIZE);
+        if (read_bytes == -1)
+        {
+            ESP_LOGE(TAG, "Failed to read file : %s", filepath);
+        }
+        else if (read_bytes > 0)
+        {
+            /* Send the buffer contents as HTTP response chunk */
+            if (httpd_resp_send_chunk(req, chunk, read_bytes) != ESP_OK)
+            {
+                close(fd);
+                ESP_LOGE(TAG, "File sending failed!");
+                /* Abort sending file */
+                httpd_resp_sendstr_chunk(req, NULL);
+                /* Respond with 500 Internal Server Error */
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "");
+                return ESP_FAIL;
+            }
+        }
+    } while (read_bytes > 0);
+    /* Close file after sending complete */
+    close(fd);
+    ESP_LOGI(TAG, "File sending complete");
+    /* Respond with an empty chunk to signal HTTP response completion */
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+/* Send HTTP response with the contents of the requested file */
+static esp_err_t admin_get_handler(httpd_req_t *req)
+{
+    if (!authorize(req, ADMIN_LOGIN, true))
+    {
+        return ESP_OK; // if not authorize return here
     }
+
+    char filepath[FILE_PATH_MAX];
+
+    rest_server_context_t *rest_context = (rest_server_context_t *)req->user_ctx;
+    strlcpy(filepath, rest_context->base_path, sizeof(filepath));
+    strlcat(filepath, req->uri, sizeof(filepath));
+
     int fd = open(filepath, O_RDONLY, 0);
     if (fd == -1)
     {
@@ -199,6 +342,7 @@ static esp_err_t admin_get_handler(httpd_req_t *req)
 /* Send HTTP response with the contents of the requested file */
 static esp_err_t rest_common_get_handler(httpd_req_t *req)
 {
+
     char filepath[FILE_PATH_MAX];
 
     rest_server_context_t *rest_context = (rest_server_context_t *)req->user_ctx;
@@ -206,10 +350,19 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
     if (req->uri[strlen(req->uri) - 1] == '/')
     {
         strlcat(filepath, "/index.html", sizeof(filepath));
+
+        if (!authorize(req, USER_LOGIN, true))
+        {
+            return ESP_OK;
+        }
     }
     else
     {
         strlcat(filepath, req->uri, sizeof(filepath));
+        if (!authorize(req, ANY_USER, true))
+        {
+            return ESP_OK;
+        }
     }
     int fd = open(filepath, O_RDONLY, 0);
     if (fd == -1)
@@ -258,7 +411,7 @@ static esp_err_t rest_common_get_handler(httpd_req_t *req)
 static esp_err_t change_date_time_handler(httpd_req_t *req)
 {
 
-    if (!authorize(req))
+    if (!authorize(req, ANY_USER, true))
     {
         return ESP_OK;
     }
@@ -288,7 +441,32 @@ static esp_err_t change_date_time_handler(httpd_req_t *req)
 
     cJSON *root = cJSON_Parse(buf);
 
+    char resp[100];
+    int year, month, day, hh, mm, ss;
     // Parse JSON
+    cJSON *cYear = cJSON_GetObjectItemCaseSensitive(root, "year");
+    cJSON *cMonth = cJSON_GetObjectItemCaseSensitive(root, "month");
+    cJSON *cDay = cJSON_GetObjectItemCaseSensitive(root, "day");
+    cJSON *cHH = cJSON_GetObjectItemCaseSensitive(root, "hh");
+    cJSON *cMM = cJSON_GetObjectItemCaseSensitive(root, "mm");
+    cJSON *cSS = cJSON_GetObjectItemCaseSensitive(root, "ss");
+
+    if (cYear && cMonth && cDay && cHH && cMM && cSS)
+    {
+        year = cYear->valueint;
+        month = cMonth->valueint;
+        day = cDay->valueint;
+        hh = cHH->valueint;
+        mm = cMM->valueint;
+        ss = cSS->valueint;
+
+        RTCsettime(year, month, day, hh, mm, ss);
+        strcpy(resp, "Date/Time saved successfully");
+    }
+    else
+    {
+        strcpy(resp, "Failed");
+    }
 
     cJSON_Delete(root);
     httpd_resp_sendstr(req, "Date/Time saved successfully");
@@ -298,7 +476,7 @@ static esp_err_t change_date_time_handler(httpd_req_t *req)
 static esp_err_t factory_reset_handler(httpd_req_t *req)
 {
 
-    if (!authorize(req))
+    if (!authorize(req, ANY_USER, true))
     {
         return ESP_OK;
     }
@@ -312,7 +490,7 @@ static esp_err_t factory_reset_handler(httpd_req_t *req)
 static esp_err_t api_settings_handler(httpd_req_t *req)
 {
 
-    if (!authorize(req))
+    if (!authorize(req, ANY_USER, true))
     {
         return ESP_OK;
     }
@@ -363,6 +541,20 @@ static esp_err_t api_settings_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "STATUS : %u", API_CALL_STATUS);
     }
 
+    cJSON *api_key = cJSON_GetObjectItemCaseSensitive(root, "key");
+    if (api_key)
+    {
+        setAPI_KEY(api_key->valuestring);
+        ESP_LOGI(TAG, "API KEY : %s", API_KEY);
+    }
+
+    cJSON *comp_id = cJSON_GetObjectItemCaseSensitive(root, "id");
+    if (comp_id)
+    {
+        setCOMPANY_ID(comp_id->valuestring);
+        ESP_LOGI(TAG, "STATUS : %s", COMPANY_ID);
+    }
+
     // Parse JSON
 
     cJSON_Delete(root);
@@ -373,7 +565,7 @@ static esp_err_t api_settings_handler(httpd_req_t *req)
 static esp_err_t save_wifi_handler(httpd_req_t *req)
 {
 
-    if (!authorize(req))
+    if (!authorize(req, ANY_USER, true))
     {
         return ESP_OK;
     }
@@ -426,13 +618,71 @@ static esp_err_t save_wifi_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static esp_err_t change_password_handler(httpd_req_t *req)
+#define DEFAULT_SCAN_LIST_SIZE 15
+
+esp_err_t wifi_scan_handler(httpd_req_t *req)
 {
 
-    if (!authorize(req))
+    if (!authorize(req, ANY_USER, true))
     {
         return ESP_OK;
     }
+
+    uint16_t number = DEFAULT_SCAN_LIST_SIZE;
+    wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
+    uint16_t ap_count = 0;
+    memset(ap_info, 0, sizeof(ap_info));
+
+    // char response_buffer[2048];
+    // response_buffer[0] = '\0';
+    esp_wifi_scan_start(NULL, true);
+    ESP_LOGI(TAG, "Max AP number ap_info can hold = %u", number);
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
+    ESP_LOGI(TAG, "Total APs scanned = %u, actual AP number ap_info holds = %u", ap_count, number);
+    cJSON *root = cJSON_CreateObject();
+    cJSON *scan_array = cJSON_AddArrayToObject(root, "scan_result");
+    for (int i = 0; i < number; i++)
+    {
+        // ESP_LOGI(TAG, "SSID \t\t%s", ap_info[i].ssid);
+        // ESP_LOGI(TAG, "RSSI \t\t%d", ap_info[i].rssi);
+        cJSON_AddItemToArray(scan_array, cJSON_CreateString((const char *)ap_info[i].ssid));
+        // strcat(response_buffer, (const char *)ap_info[i].ssid);
+        // strcat(response_buffer, "\n");
+    }
+
+    // free(ap_records);
+    char *response_buffer = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, response_buffer, HTTPD_RESP_USE_STRLEN);
+    cJSON_Delete(root);
+    free(response_buffer);
+    return ESP_OK;
+}
+
+static esp_err_t change_password_handler(httpd_req_t *req)
+{
+
+    bool isAdmin = false;
+    bool isUser = false;
+    isAdmin = authorize(req, ADMIN_LOGIN, false);
+
+    if (isAdmin)
+    {
+        goto CHANGE_PWD;
+    }
+
+    isUser = authorize(req, USER_LOGIN, false);
+
+    if (isUser)
+    {
+        goto CHANGE_PWD;
+    }
+
+    httpd_resp_sendstr(req, "Auth Failed");
+    return ESP_OK;
+
+CHANGE_PWD:
 
     int total_len = req->content_len;
     int cur_len = 0;
@@ -464,9 +714,14 @@ static esp_err_t change_password_handler(httpd_req_t *req)
     int ret = 0;
     if (current && new)
     {
-        if (strcmp(current->valuestring, API_PASSWORD) == 0)
+        if ((strcmp(current->valuestring, ADMIN_PASSWORD) == 0) && (isAdmin))
         {
             setADMIN_PASSWORD(new->valuestring);
+            ret = 1;
+        }
+        else if ((strcmp(current->valuestring, USER_PASSWORD) == 0) && (isUser))
+        {
+            setUSER_PASSWORD(new->valuestring);
             ret = 1;
         }
         else
@@ -485,27 +740,23 @@ static esp_err_t change_password_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-void get_mac_address(char *mac_address)
-{
-    uint8_t mac[6];
-    esp_wifi_get_mac(ESP_IF_WIFI_STA, mac);
-    sprintf(mac_address, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-}
-
 // HTTP GET handler function
 esp_err_t mac_address_handler(httpd_req_t *req)
 {
-    char mac_address[13]; // 12 characters for the MAC address without colons + null terminator
-    get_mac_address(mac_address);
 
     // Send the MAC address as the HTTP response
-    httpd_resp_send(req, mac_address, strlen(mac_address));
+    httpd_resp_send(req, ESP_MAC_ADDR, strlen(ESP_MAC_ADDR));
 
     return ESP_OK;
 }
 
 esp_err_t get_wifi_handler(httpd_req_t *req)
 {
+
+    if (!authorize(req, ANY_USER, true))
+    {
+        return ESP_OK;
+    }
 
     cJSON *root = cJSON_CreateObject();
 
@@ -533,8 +784,48 @@ esp_err_t get_wifi_status_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t get_admin_settings_handler(httpd_req_t *req)
+{
+
+    if (!authorize(req, ANY_USER, true))
+    {
+        return ESP_OK;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    char c[30];
+
+    if (root)
+    {
+        cJSON_AddStringToObject(root, "mac", (ESP_MAC_ADDR));
+        cJSON_AddStringToObject(root, "url", (API_URL));
+        cJSON_AddStringToObject(root, "key", (API_KEY));
+        cJSON_AddStringToObject(root, "id", (COMPANY_ID));
+        sprintf(c, "%lu", API_CALL_INTERVAL);
+        cJSON_AddStringToObject(root, "interval", (c));
+        sprintf(c, "%u", API_CALL_STATUS);
+        cJSON_AddStringToObject(root, "status", (c));
+        cJSON_AddStringToObject(root, "ssid", WIFI_SSID);
+        cJSON_AddStringToObject(root, "pwd", WIFI_PASS);
+
+        char *buf = cJSON_PrintUnformatted(root);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, buf, strlen(buf));
+        free(buf);
+        buf = NULL;
+    }
+
+    return ESP_OK;
+}
+
 esp_err_t get_api_settings_handler(httpd_req_t *req)
 {
+
+    if (!authorize(req, ANY_USER, true))
+    {
+        return ESP_OK;
+    }
+
     cJSON *root = cJSON_CreateObject();
     char c[30];
 
@@ -575,6 +866,35 @@ esp_err_t get_eth_status_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t get_device_status_handler(httpd_req_t *req)
+{
+    cJSON *root = cJSON_CreateObject();
+    char c[30];
+
+    char eth_status_string[64];
+    Eth_Status_String(eth_status_string);
+
+    char door_status_string[64];
+    Door_Status_String(door_status_string);
+
+    char wifi_status_string[64];
+    WiFi_Status_String(wifi_status_string);
+
+    if (root)
+    {
+        cJSON_AddStringToObject(root, "mac", (ESP_MAC_ADDR));
+        cJSON_AddStringToObject(root, "eth", (eth_status_string));
+        cJSON_AddStringToObject(root, "wifi", (wifi_status_string));
+        cJSON_AddStringToObject(root, "door", (door_status_string));
+        char *buf = cJSON_PrintUnformatted(root);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, buf, strlen(buf));
+        free(buf);
+        buf = NULL;
+    }
+
+    return ESP_OK;
+}
 esp_err_t start_rest_server(const char *base_path)
 {
     REST_CHECK(base_path, "wrong base path", err);
@@ -584,7 +904,8 @@ esp_err_t start_rest_server(const char *base_path)
 
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 15;
+    config.max_uri_handlers = 21;
+    config.stack_size = (1024 * 10);
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     ESP_LOGI(TAG, "Starting HTTP Server");
@@ -678,6 +999,36 @@ esp_err_t start_rest_server(const char *base_path)
 
     httpd_register_uri_handler(server, &get_door_status_uri);
 
+    httpd_uri_t load_admin_settings_uri = {
+        .uri = "/getAdminSettings",
+        .method = HTTP_GET,
+        .handler = get_admin_settings_handler,
+        .user_ctx = NULL};
+
+    httpd_register_uri_handler(server, &load_admin_settings_uri);
+
+    httpd_uri_t get_device_status_uri = {
+        .uri = "/getDeviceStatus",
+        .method = HTTP_GET,
+        .handler = get_device_status_handler,
+        .user_ctx = NULL};
+
+    httpd_register_uri_handler(server, &get_device_status_uri);
+
+    httpd_uri_t get_logs_uri = {
+        .uri = "/getLogs",
+        .method = HTTP_GET,
+        .handler = log_handler,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &get_logs_uri);
+
+    httpd_uri_t get_pendinglogs_uri = {
+        .uri = "/getPendingLogs",
+        .method = HTTP_GET,
+        .handler = pending_log_handler,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &get_pendinglogs_uri);
+
     /* URI handler for admin page */
     httpd_uri_t admin_get_uri = {
         .uri = "/admin.html",
@@ -686,7 +1037,24 @@ esp_err_t start_rest_server(const char *base_path)
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &admin_get_uri);
 
-    /* URI handler for getting web server files */
+    httpd_uri_t user_get_uri = {
+        .uri = "/index.html",
+        .method = HTTP_GET,
+        .handler = user_get_handler,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &user_get_uri);
+
+    httpd_uri_t wifi_scan_uri = {
+        .uri = "/wifi_scan",
+        .method = HTTP_GET,
+        .handler = wifi_scan_handler,
+        .user_ctx = rest_context};
+
+    httpd_register_uri_handler(server, &wifi_scan_uri);
+    // user_get_uri.uri = "/";
+    // httpd_register_uri_handler(server, &user_get_uri);
+
+    // /* URI handler for getting web server files */
     httpd_uri_t common_get_uri = {
         .uri = "/*",
         .method = HTTP_GET,

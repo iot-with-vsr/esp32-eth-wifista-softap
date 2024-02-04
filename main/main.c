@@ -25,6 +25,8 @@ ESP32 - W500
 #include "lwip/apps/netbiosns.h"
 #include "server_setup.h"
 #include "system_config.h"
+#include "api_thread.h"
+#include "common_rtc.h"
 
 #define MDNS_INSTANCE "esp web server"
 #define CONFIG_MDNS_HOST_NAME "esp"
@@ -85,6 +87,12 @@ esp_err_t init_fs(void)
     return ESP_OK;
 }
 
+static void print_system_info_timercb(void *timer)
+{
+    ESP_LOGI(TAG, "System information, free heap: %lu", esp_get_free_heap_size());
+    print_system_time();
+}
+
 void app_main(void)
 {
     // Initialize NVS
@@ -105,6 +113,9 @@ void app_main(void)
     netbiosns_init();
     netbiosns_set_name(CONFIG_MDNS_HOST_NAME);
 
+    // initialize rtc
+    RTCinit();
+
     // load system config
     load_system_config();
 
@@ -114,9 +125,19 @@ void app_main(void)
     // App Wifi Station/SoftAP
     app_wifi_init();
 
+    // Get System Mac address
+    get_mac_address();
+
     // Initialize filesystem
     init_fs();
 
     // Server
     start_rest_server(CONFIG_WEB_MOUNT_POINT);
+
+    // Start API Call Thread
+    start_api_thread();
+
+    TimerHandle_t timer = xTimerCreate("print_system_info", 10000 / portTICK_PERIOD_MS,
+                                       true, NULL, print_system_info_timercb);
+    xTimerStart(timer, 0);
 }
