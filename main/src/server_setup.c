@@ -487,6 +487,61 @@ static esp_err_t factory_reset_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t relay_sensor_settings_handler(httpd_req_t *req)
+{
+
+    if (!authorize(req, ANY_USER, true))
+    {
+        return ESP_OK;
+    }
+
+    int total_len = req->content_len;
+    int cur_len = 0;
+    char *buf = ((rest_server_context_t *)(req->user_ctx))->scratch;
+    int received = 0;
+    if (total_len >= SCRATCH_BUFSIZE)
+    {
+        /* Respond with 500 Internal Server Error */
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_FAIL;
+    }
+    while (cur_len < total_len)
+    {
+        received = httpd_req_recv(req, buf + cur_len, total_len);
+        if (received <= 0)
+        {
+            /* Respond with 500 Internal Server Error */
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
+            return ESP_FAIL;
+        }
+        cur_len += received;
+    }
+    buf[total_len] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+
+    cJSON *sens_type = cJSON_GetObjectItemCaseSensitive(root, "sens_type");
+    if (sens_type)
+    {
+        setSENS_TYPE(sens_type->valueint);
+        ESP_LOGI(TAG, "SENS_TYPE : %d", SENS_TYPE);
+    }
+
+    cJSON *relay_type = cJSON_GetObjectItemCaseSensitive(root, "relay_type");
+    if (relay_type)
+    {
+        setRELAY_TYPE(relay_type->valueint);
+        ESP_LOGI(TAG, "RELAY_TYPE : %d", RELAY_TYPE);
+    }
+
+    // Parse JSON
+
+    cJSON_Delete(root);
+    httpd_resp_sendstr(req, "Settings saved successfully");
+    return ESP_OK;
+}
+
+
 static esp_err_t api_settings_handler(httpd_req_t *req)
 {
 
@@ -807,6 +862,10 @@ esp_err_t get_admin_settings_handler(httpd_req_t *req)
         cJSON_AddStringToObject(root, "status", (c));
         cJSON_AddStringToObject(root, "ssid", WIFI_SSID);
         cJSON_AddStringToObject(root, "pwd", WIFI_PASS);
+        sprintf(c, "%u", RELAY_TYPE);
+        cJSON_AddStringToObject(root, "relay_type", c);
+        sprintf(c, "%u", SENS_TYPE);
+        cJSON_AddStringToObject(root, "sens_type", c);
 
         char *buf = cJSON_PrintUnformatted(root);
         httpd_resp_set_type(req, "application/json");
@@ -934,6 +993,14 @@ esp_err_t start_rest_server(const char *base_path)
         .user_ctx = rest_context};
 
     httpd_register_uri_handler(server, &save_api_uri);
+
+     httpd_uri_t relay_sensor_settings = {
+        .uri = "/saveRelaySensorSettings",
+        .method = HTTP_POST,
+        .handler = relay_sensor_settings_handler,
+        .user_ctx = rest_context};
+
+    httpd_register_uri_handler(server, &relay_sensor_settings);
 
     httpd_uri_t factory_reset_uri = {
         .uri = "/factoryReset",

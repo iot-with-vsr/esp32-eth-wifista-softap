@@ -16,16 +16,6 @@ static const char *TAG = "api-thread";
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 
-#define NORMALLY_OPEN 1
-#define NORMALLY_CLOSED 0
-
-#define RELAY_TYPE NORMALLY_OPEN
-#define SENS_TYPE NORMALLY_OPEN
-#define BUTTON_TYPE NORMALLY_OPEN
-#define Time 10000
-
-#define RELAY_ON_DURATION 10000
-
 #define RELAY_GPIO_PIN 2
 #define RELAY_GPIO_BIT_MASK (1ULL << RELAY_GPIO_PIN)
 #define BUZZER_GPIO_PIN 14
@@ -774,7 +764,7 @@ static void buttonThread(void *pvParameters)
                     Buzz_on = false;
                 }
             }
-            else if ((millis() - Sens_Prev_time) > Time)
+            else if ((millis() - Sens_Prev_time) > SENS_DETECT_TIME)
             {
                 if (!Buzz_on)
                 {

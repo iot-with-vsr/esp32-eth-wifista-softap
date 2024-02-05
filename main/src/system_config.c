@@ -19,6 +19,8 @@ char ADMIN_PASSWORD[64];
 char ESP_MAC_ADDR[13];
 uint32_t API_CALL_INTERVAL;
 uint8_t API_CALL_STATUS;
+uint8_t SENS_TYPE;
+uint8_t RELAY_TYPE;
 
 Eth_Status_t eth_status;
 WiFi_Status_t wifi_status;
@@ -273,6 +275,18 @@ void setAPI_STATUS(uint8_t new_status)
     utils_nvs_set_u8(NVS_API_STATUS, API_CALL_STATUS);
 }
 
+void setRELAY_TYPE(uint8_t relay_type)
+{
+    RELAY_TYPE = relay_type;
+    utils_nvs_set_u8(NVS_RELAY_TYPE_KEY, RELAY_TYPE);
+}
+
+void setSENS_TYPE(uint8_t sens_type)
+{
+    SENS_TYPE = sens_type;
+    utils_nvs_set_u8(NVS_SENS_TYPE_KEY, SENS_TYPE);
+}
+
 void get_mac_address(void)
 {
     uint8_t mac[6];
@@ -399,4 +413,29 @@ void load_system_config(void)
     {
         ESP_LOGI(TAG, "API_CALL_STATUS NVS : %u", API_CALL_STATUS);
     }
+
+    //RELAY TYPE
+    if (utils_nvs_get_u8(NVS_RELAY_TYPE_KEY, &RELAY_TYPE) != ESP_OK)
+    {
+        RELAY_TYPE = DEFAULT_RELAY_TYPE;
+        utils_nvs_set_u8(NVS_RELAY_TYPE_KEY, RELAY_TYPE);
+        ESP_LOGW(TAG, "DEFAULT RELAY_TYPE : %u", RELAY_TYPE);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "RELAY_TYPE NVS : %u", RELAY_TYPE);
+    }
+
+    //SENS TYPE
+    if (utils_nvs_get_u8(NVS_SENS_TYPE_KEY, &SENS_TYPE) != ESP_OK)
+    {
+        SENS_TYPE = DEFAULT_SENS_TYPE;
+        utils_nvs_set_u8(NVS_SENS_TYPE_KEY, SENS_TYPE);
+        ESP_LOGW(TAG, "DEFAULT SENS_TYPE : %u", SENS_TYPE);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "SENS_TYPE NVS : %u", SENS_TYPE);
+    }
+
 }

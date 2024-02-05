@@ -9,7 +9,7 @@
   </head>
 
   <body style="overflow: scroll">
-    <div class="container" id="main" style="display: none;">
+    <div class="container" id="main" style="display: block;">
       <h1>AmpleTrails Door Control System</h1>
       <button onclick="window.location.href='/index.html';">
         <span>Go to User Page</span>
@@ -37,17 +37,23 @@
 
       <fieldset>
         <legend>WiFi Settings</legend>
+        <div class="form-row">
+          <label for="current_ssid">CURRENT SAVED SSID:</label>
+          <input type="text" id="current_ssid" readonly/>
+        </div>
         <!--<h3>Set Date & Time</h3>-->
-        <form onsubmit="saveWiFiSettings(event)">
+        <!-- <form onsubmit="saveWiFiSettings(event)"> -->
         <div class="form-row">
           <label for="ssid">SSID:</label>
-          <input type="text" id="ssid" />
+          <select id="ssid">
+          </select>
+          <button style="margin-left: 10px;" onclick="fetchSSIDs()">Refresh</button>
         </div>
         <div class="form-row">
           <label for="pwd">PASSWORD:</label>
           <input type="password" id="pwd" />
         </div>
-        <button class="btn">Save</button>
+        <button onclick="saveWiFiSettings()">Save</button>
       </form>
       </fieldset>
 
@@ -99,11 +105,42 @@
         <button onclick="factoryReset()">Factory Reset</button>
         <button onclick="changePasswordModal()">Change Admin Password</button>
       </fieldset>
+
       <fieldset>
-        <legend>Logs</legend>
+        <legend>Relay And Sensor Settings</legend>
         <!--<h3>Set Date & Time</h3>-->
-        <span class="textarea" id="logs" role="textbox" contenteditable></span>
+        <form onsubmit="saveIOSettings(event)">
+          <div class="form-row">
+          <label for="relay_type">RELAY TYPE:</label>
+          <select id="relay_type">
+            <option value=0>NORMALLY OPEN</option>
+            <option value=1>NORMALLY CLOSED</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="sens_type">SENSOR TYPE:</label>
+          <select id="sens_type">
+            <option value=0>NORMALLY OPEN</option>
+            <option value=1>NORMALLY CLOSED</option>
+          </select>
+        </div>
+        <button class="btn">Save</button>
+      </form>
       </fieldset>
+
+      <fieldset>
+        <legend>Logs </legend>
+        <button onclick="fetchLogs()">Fetch</button><br>
+      <fieldset>
+        <legend>Current Logs</legend>
+        <textarea id="logs"></textarea>
+      </fieldset>
+
+      <fieldset>
+        <legend>Pending Logs</legend>
+        <textarea id="Pendinglogs"></textarea>
+      </fieldset>
+    </fieldset>
     </div>
 
     <div style="overflow: scroll; width: 100%">
@@ -145,7 +182,7 @@
         changePwdModal.style.display = "none";
       };
 
-      async function updateDeviceStatus() {
+async function updateDeviceStatus() {
   try {
     const ser_uri = "/getDeviceStatus";
     const ser_response = await fetch(ser_uri);
@@ -163,6 +200,41 @@
     //console.error("Error updating device status:", error);
   }
 }
+
+      async function fetchLogs(){
+        let uri = "/getLogs";
+        let resp = await fetch(uri);
+        let resp_txt = await resp.text();
+        document.getElementById("logs").innerHTML = resp_txt;
+
+        uri = "/getPendingLogs";
+        resp = await fetch(uri);
+        resp_txt = await resp.text();
+        document.getElementById("pendinglogs").innerHTML = resp_txt;
+
+      }
+
+      async function fetchSSIDs(){
+
+        try{
+            let uri = "/wifi_scan";
+            let resp = await fetch(uri);
+            let jsonResponse = await resp.json();
+            var selectElement = document.getElementById("ssid");
+
+            // Clear previous options
+            selectElement.innerHTML = '';
+
+            // Add new options based on JSON response
+            jsonResponse.scan_result.forEach(function(ssid) {
+              var option = document.createElement("option");
+              option.text = ssid;
+              selectElement.add(option);
+            });
+          }catch(e){
+
+          }
+      }
 
       function changeAPIStatus(){
         const status = document.getElementById("status").value;
@@ -310,8 +382,8 @@ if(response_txt == "Date/Time saved successfully"){
 			}
 		}
 
-    async function saveWiFiSettings(event){
-      event.preventDefault();
+    async function saveWiFiSettings(){
+      // event.preventDefault();
       const ssid = document.getElementById("ssid").value;
       const pwd = document.getElementById("pwd").value;
 
@@ -327,6 +399,28 @@ if(response_txt == "Date/Time saved successfully"){
       }else{
         alert("WiFi Settings could not be saved.")
       }
+    }
+
+    async function saveIOSettings(event){
+      event.preventDefault();
+
+      const relay_type = document.getElementById("relay_type").value;
+      const sens_type = document.getElementById("sens_type").value;
+      //const status = document.getElementById("status").value;
+
+      let obj = new Object({});
+      obj.relay_type = relay_type;
+      obj.sens_type = sens_type;
+      const response = await makePostRequest("saveRelaySensorSettings", obj);
+      const response_txt = await response.text();
+
+      if(response_txt == "Settings saved successfully"){
+        alert(response_txt);
+      }else{
+        alert("Settings could not be saved.")
+      }
+
+
     }
 
     async function saveAPiSettings(event){
@@ -365,12 +459,14 @@ if(response_txt == "Date/Time saved successfully"){
         const ser_response = await fetch(ser_uri);
         const ser_response_txt = await ser_response.json();
         document.getElementById("serialno").innerHTML = ser_response_txt.mac;
-        document.getElementById("ssid").value = ser_response_txt.ssid;
+        document.getElementById("current_ssid").value = ser_response_txt.ssid;
         document.getElementById("pwd").value = ser_response_txt.pwd;
         document.getElementById("interval").value = ser_response_txt.interval;
         document.getElementById("apiurl").value = ser_response_txt.url;
         document.getElementById("apikey").value = ser_response_txt.key;
         document.getElementById("comp").value = ser_response_txt.id;
+        document.getElementById("relay_type").value = parseInt(ser_response_txt.relay_type);
+        document.getElementById("sens_type").value = parseInt(ser_response_txt.sens_type);
         if(ser_response_txt.status == "1"){
           document.getElementById("status").value = "DISABLE";
           document.getElementById("status").style.backgroundColor = "red";
